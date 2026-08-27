@@ -1,0 +1,1135 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<!-- 本工作台为本地 PWA 方案：应用文件在本地，数据存储在本机（localStorage），离线可用，不依赖任何云端链接；用浏览器「添加到主屏幕」即可像 App 一样安装 -->
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#1f9d6b">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="攒钱小台">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>攒钱小台 · 学生记账与钱生钱</title>
+<style>
+  :root{
+    --primary:#1f9d6b;
+    --primary-dark:#157a52;
+    --primary-soft:#e7f6ef;
+    --income:#16a34a;
+    --expense:#e5484d;
+    --warn:#f59e0b;
+    --text:#1f2933;
+    --text-soft:#64748b;
+    --bg:#f4f7f6;
+    --card:#ffffff;
+    --line:#e6ebed;
+    --radius:16px;
+    --shadow:0 2px 12px rgba(16,40,30,.06);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;
+    background:var(--bg);color:var(--text);font-size:15px;line-height:1.5;
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  .wrap{max-width:860px;margin:0 auto;padding:0 14px 90px}
+  header{
+    position:sticky;top:0;z-index:30;background:var(--primary);
+    color:#fff;padding:14px 16px;box-shadow:0 2px 10px rgba(0,0,0,.08);
+  }
+  .hdr-row{display:flex;align-items:center;justify-content:space-between;gap:10px;max-width:860px;margin:0 auto}
+  .brand{display:flex;align-items:center;gap:9px;font-weight:700;font-size:18px}
+  .brand svg{width:24px;height:24px;flex:none}
+  .hdr-actions{display:flex;gap:8px;align-items:center}
+  .pill{
+    display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.18);
+    border:none;color:#fff;font-size:12.5px;padding:7px 10px;border-radius:999px;cursor:pointer;
+    min-height:36px;
+  }
+  .pill svg{width:15px;height:15px}
+  .pill:active{background:rgba(255,255,255,.32)}
+  .sync{font-size:11.5px;background:rgba(255,255,255,.14);padding:5px 9px;border-radius:999px;display:inline-flex;align-items:center;gap:5px}
+  .sync .dot{width:7px;height:7px;border-radius:50%;background:#ffe08a}
+
+  /* 今天要处理 */
+  .today{margin:14px 0 4px}
+  .today h2{font-size:14px;color:var(--text-soft);margin:0 0 8px;font-weight:600;display:flex;align-items:center;gap:6px}
+  .task{
+    display:flex;align-items:center;gap:10px;background:var(--card);border-radius:12px;
+    padding:11px 12px;margin-bottom:8px;box-shadow:var(--shadow);border-left:4px solid var(--primary);
+  }
+  .task.overdue{border-left-color:var(--expense);background:#fff6f6}
+  .task.warn{border-left-color:var(--warn)}
+  .task .t-ico{width:34px;height:34px;border-radius:9px;background:var(--primary-soft);display:flex;align-items:center;justify-content:center;flex:none}
+  .task.overdue .t-ico{background:#fdeaea}
+  .task .t-ico svg{width:18px;height:18px;stroke:var(--primary)}
+  .task.overdue .t-ico svg{stroke:var(--expense)}
+  .task .t-body{flex:1;min-width:0}
+  .task .t-title{font-weight:600;font-size:14px}
+  .task.overdue .t-title{color:var(--expense)}
+  .task .t-sub{font-size:12px;color:var(--text-soft)}
+  .task .t-btn{
+    flex:none;border:none;background:var(--primary);color:#fff;border-radius:9px;
+    padding:8px 12px;font-size:13px;font-weight:600;cursor:pointer;min-height:38px;
+  }
+  .task.overdue .t-btn{background:var(--expense)}
+  .task .t-btn:active{opacity:.85}
+
+  /* 导航 */
+  nav.tabs{
+    position:sticky;top:58px;z-index:20;background:var(--bg);
+    display:flex;gap:6px;padding:10px 0;border-bottom:1px solid var(--line);
+  }
+  nav.tabs button{
+    flex:1;border:none;background:transparent;color:var(--text-soft);font-size:13.5px;
+    font-weight:600;padding:9px 4px;border-radius:10px;cursor:pointer;display:flex;
+    flex-direction:column;align-items:center;gap:4px;min-height:48px;
+  }
+  nav.tabs button svg{width:20px;height:20px;stroke:currentColor}
+  nav.tabs button.active{background:var(--primary-soft);color:var(--primary)}
+
+  .panel{display:none;margin-top:14px;animation:fade .2s ease}
+  .panel.active{display:block}
+  @keyframes fade{from{opacity:.3;transform:translateY(4px)}to{opacity:1}}
+
+  .card{background:var(--card);border-radius:var(--radius);padding:16px;margin-bottom:14px;box-shadow:var(--shadow)}
+  .card h3{margin:0 0 12px;font-size:15px;display:flex;align-items:center;gap:7px}
+  .card h3 svg{width:18px;height:18px;stroke:var(--primary)}
+
+  /* 概览卡片 */
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .stat{background:var(--card);border-radius:12px;padding:12px;box-shadow:var(--shadow);text-align:center}
+  .stat .s-label{font-size:12px;color:var(--text-soft)}
+  .stat .s-val{font-size:19px;font-weight:700;margin-top:3px}
+  .stat .s-val.income{color:var(--income)}
+  .stat .s-val.expense{color:var(--expense)}
+  .stat .s-val.save{color:var(--primary)}
+
+  /* 表单 */
+  .fld{margin-bottom:12px}
+  .fld label{display:block;font-size:13px;color:var(--text-soft);margin-bottom:6px}
+  .seg{display:flex;background:#eef2f1;border-radius:10px;padding:4px;gap:4px}
+  .seg button{flex:1;border:none;background:transparent;padding:10px;border-radius:8px;font-size:14px;font-weight:600;color:var(--text-soft);cursor:pointer;min-height:44px}
+  .seg button.on[data-t="income"]{background:var(--income);color:#fff}
+  .seg button.on[data-t="expense"]{background:var(--expense);color:#fff}
+  select,input[type=text],input[type=number],input[type=date]{
+    width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;
+    font-size:16px;background:#fff;color:var(--text);min-height:46px;
+  }
+  input:focus,select:focus{outline:none;border-color:var(--primary)}
+  .btn-primary{
+    width:100%;border:none;background:var(--primary);color:#fff;font-size:16px;font-weight:700;
+    padding:13px;border-radius:12px;cursor:pointer;min-height:50px;
+  }
+  .btn-primary:active{background:var(--primary-dark)}
+  .btn-line{width:100%;border:1px solid var(--line);background:#fff;color:var(--text);font-size:14px;font-weight:600;padding:11px;border-radius:11px;cursor:pointer;min-height:46px}
+  .btn-line:active{background:#f3f6f5}
+  .btn-line.danger{color:var(--expense);border-color:#f3c9cb}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+  /* 列表 */
+  .tx{display:flex;align-items:center;gap:10px;padding:11px 2px;border-bottom:1px solid var(--line)}
+  .tx:last-child{border-bottom:none}
+  .tx .ic{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex:none}
+  .tx .ic svg{width:19px;height:19px}
+  .tx .ic.exp{background:#fdeaea}.tx .ic.exp svg{stroke:var(--expense)}
+  .tx .ic.inc{background:#e8f6ee}.tx .ic.inc svg{stroke:var(--income)}
+  .tx .meta{flex:1;min-width:0}
+  .tx .cat{font-weight:600;font-size:14px}
+  .tx .note{font-size:12px;color:var(--text-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tx .amt{font-weight:700;font-size:15px;white-space:nowrap}
+  .tx .amt.exp{color:var(--expense)}
+  .tx .amt.inc{color:var(--income)}
+  .tx .del{border:none;background:transparent;color:var(--text-soft);cursor:pointer;padding:8px;min-height:40px;min-width:40px}
+  .tx .del svg{width:17px;height:17px;stroke:var(--text-soft)}
+  .empty{text-align:center;color:var(--text-soft);padding:26px 0;font-size:13.5px}
+
+  /* 图表 */
+  .donut-wrap{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+  .legend{font-size:13px;flex:1;min-width:150px}
+  .legend .li{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+  .legend .sw{width:11px;height:11px;border-radius:3px;flex:none}
+  .legend b{margin-left:auto}
+  .bar{height:14px;border-radius:8px;background:#eef2f1;overflow:hidden;margin:8px 0 4px}
+  .bar > i{display:block;height:100%;border-radius:8px;background:var(--primary)}
+  .bar-warn > i{background:var(--warn)}
+  .bar-bad > i{background:var(--expense)}
+
+  /* 钱生钱 */
+  .prod{margin:10px 0;padding:13px 13px 12px;border:1px solid var(--line);border-radius:13px;background:#fff}
+  .prod:last-child{margin-bottom:0}
+  .prod.low{border-left:4px solid var(--income)}
+  .prod.mid{border-left:4px solid var(--warn)}
+  .prod .p-head{display:flex;gap:11px;align-items:flex-start}
+  .prod .p-ico{width:42px;height:42px;border-radius:11px;background:var(--primary-soft);display:flex;align-items:center;justify-content:center;flex:none}
+  .prod .p-ico svg{width:22px;height:22px;stroke:var(--primary)}
+  .prod .p-title{flex:1;min-width:0}
+  .prod .p-name{font-weight:700;font-size:14.5px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .tag{font-size:11px;padding:2px 7px;border-radius:999px;font-weight:600;white-space:nowrap}
+  .tag.low{background:#e8f6ee;color:var(--income)}
+  .tag.mid{background:#fff3e0;color:#d97706}
+  .prod .p-rate{font-size:12.5px;font-weight:700;color:var(--primary);margin-top:4px;line-height:1.5}
+  .prod .p-sec{display:flex;gap:8px;margin-top:10px;align-items:flex-start}
+  .prod .p-label{flex:none;width:56px;font-size:11.5px;font-weight:700;color:#fff;background:var(--primary);border-radius:7px;padding:3px 0;text-align:center;margin-top:1px}
+  .prod .p-text{font-size:12.8px;line-height:1.72;color:var(--text);flex:1;min-width:0;white-space:normal}
+  .prod .p-tip{font-size:11.8px;line-height:1.6;color:#9a3412;background:#fff6ed;border-radius:9px;padding:8px 10px;margin-top:10px}
+  .disclaimer{font-size:11.5px;color:var(--text-soft);background:#f1f5f4;border-radius:10px;padding:10px 12px;margin-top:12px}
+  .switch-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;font-size:13.5px;font-weight:600;color:var(--text)}
+  .switch-row input{width:20px;height:20px;accent-color:var(--primary)}
+  .bak-status{font-size:11.5px;color:var(--text-soft);margin-top:8px;background:#eef6f1;border-radius:8px;padding:7px 10px}
+  .plan-out{background:var(--primary-soft);border-radius:12px;padding:13px;margin-top:12px;font-size:13.5px;line-height:1.7}
+  .plan-out b{color:var(--primary-dark)}
+  .plan-summary{font-size:13.5px;color:var(--text);margin-bottom:10px;font-weight:600}
+  .plan-card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px;box-shadow:0 1px 2px rgba(0,0,0,.03)}
+  .plan-card-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px}
+  .plan-card-name{font-weight:700;font-size:14px;color:var(--text)}
+  .plan-card-risk{font-size:11px;font-weight:600;padding:3px 9px;border-radius:99px;white-space:nowrap}
+  .plan-card-risk.risk-low{background:#e6f7ee;color:#0a7d4b}
+  .plan-card-risk.risk-mid{background:#fff3e0;color:#a45a00}
+  .plan-card-risk.risk-hi{background:#ffe5e5;color:#b32525}
+  .plan-items{list-style:none;padding:0;margin:0 0 8px;font-size:13px;line-height:1.85}
+  .plan-items li{display:flex;flex-wrap:wrap;gap:5px 8px;align-items:baseline;padding:3px 0;border-bottom:1px dashed #eef2f1}
+  .plan-items li:last-child{border-bottom:0}
+  .plan-items .plan-arr{color:var(--text-soft);font-size:11px}
+  .plan-items .plan-target{font-weight:600;color:var(--text)}
+  .plan-items .plan-where{color:var(--text-soft);font-size:12px}
+  .plan-items b{color:var(--primary-dark);min-width:54px;display:inline-block}
+  .plan-note{font-size:12px;color:var(--text-soft);background:#f1f5f4;border-radius:8px;padding:6px 9px;line-height:1.6}
+  .sub{font-size:12.5px;color:var(--text-soft);margin:0 0 12px;line-height:1.6}
+  .pe-ref{font-size:11.5px;color:var(--text-soft);background:#f1f5f4;border-radius:8px;padding:7px 10px;margin:10px 0;line-height:1.5}
+  .pe-out{margin-top:12px}
+  .pe-card{display:flex;align-items:center;gap:14px;background:#fff;border:1px solid var(--line);border-radius:13px;padding:14px}
+  .pe-light{width:48px;height:48px;border-radius:50%;flex:none;transition:.2s}
+  .pe-light.green{background:#22c55e;box-shadow:0 0 0 5px rgba(34,197,94,.16)}
+  .pe-light.yellow{background:#f5b301;box-shadow:0 0 0 5px rgba(245,179,1,.16)}
+  .pe-light.red{background:#ef4444;box-shadow:0 0 0 5px rgba(239,68,68,.16)}
+  .pe-status{font-weight:700;font-size:16px}
+  .pe-sub{font-size:12.5px;color:var(--text-soft);margin-top:3px}
+  .pe-advise{font-size:13px;line-height:1.7;color:var(--text);background:var(--primary-soft);border-radius:11px;padding:11px 13px;margin-top:10px}
+  .pe-advise b{color:var(--primary-dark)}
+  .pe-query{font-size:12.5px;color:var(--text-soft);margin-top:12px;display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center}
+  .pe-query .pe-query-t{font-weight:600;color:var(--text)}
+  .pe-query a{color:var(--primary);text-decoration:none;border:1px solid var(--line);border-radius:8px;padding:3px 10px;font-weight:600;background:#fff}
+  .pe-query a:active{background:var(--primary-soft)}
+  .pe-plan{margin-top:14px;border-top:1px dashed var(--line);padding-top:13px}
+  .pe-plan h4{margin:0 0 10px;font-size:14px}
+  .pe-plan-note{font-size:11.5px;color:var(--text-soft);margin-top:8px;line-height:1.5}
+
+  /* 弹窗 */
+  .mask{position:fixed;inset:0;background:rgba(15,30,25,.45);z-index:50;display:none;align-items:flex-end;justify-content:center}
+  .mask.show{display:flex}
+  .sheet{background:#fff;width:100%;max-width:860px;border-radius:18px 18px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom));animation:up .22s ease}
+  @keyframes up{from{transform:translateY(100%)}to{transform:translateY(0)}}
+  .sheet h3{margin:0 0 14px;font-size:16px}
+
+  /* 底部 Tab（移动端） */
+  nav.bottom{display:none}
+  /* 备份提醒 */
+  .backup-tip{background:#fff8e6;border:1px solid #ffe39a;color:#8a6d1a;border-radius:12px;padding:10px 12px;font-size:13px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+  .backup-tip svg{width:17px;height:17px;stroke:#b8860b;flex:none}
+
+  @media (max-width:768px){
+    nav.tabs{top:56px}
+    .sync{display:none}
+    .hdr-actions{gap:6px}
+    nav.bottom{
+      display:flex;position:fixed;bottom:0;left:0;right:0;z-index:40;
+      background:#fff;border-top:1px solid var(--line);
+      padding:6px 0 calc(6px + env(safe-area-inset-bottom));
+    }
+    nav.bottom button{
+      flex:1;border:none;background:transparent;color:var(--text-soft);
+      font-size:11.5px;display:flex;flex-direction:column;align-items:center;gap:3px;
+      cursor:pointer;padding:4px 0;
+    }
+    nav.bottom button svg{width:22px;height:22px;stroke:currentColor}
+    nav.bottom button.active{color:var(--primary)}
+  }
+  @media (min-width:769px){
+    .donut-wrap{justify-content:flex-start}
+  }
+  .toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:#1f2933;color:#fff;padding:10px 16px;border-radius:10px;font-size:13.5px;z-index:80;opacity:0;transition:opacity .2s;pointer-events:none;max-width:80%}
+  .toast.show{opacity:1}
+
+  /* 固定栏目（占1500百分比） */
+  .col-row{margin:15px 0}
+  .col-head{display:flex;justify-content:space-between;align-items:baseline;font-size:13.5px;margin-bottom:5px}
+  .col-name{font-weight:600;color:var(--text)}
+  .col-pct{font-weight:700;color:var(--primary);font-size:14px}
+  .col-bar{height:9px;background:#eef2f1;border-radius:6px;overflow:hidden}
+  .col-bar i{display:block;height:100%;border-radius:6px;transition:width .3s}
+  .col-amt{font-size:12.5px;color:var(--text);margin-top:4px}
+  .col-base{color:var(--text-soft)}
+  .col-fixed{margin-left:8px;color:var(--primary);font-size:11.5px;background:var(--primary-soft);padding:1px 7px;border-radius:7px;vertical-align:middle}
+  .col-total{margin-top:14px;padding-top:11px;border-top:1px dashed var(--line);font-size:13px;color:var(--text-soft)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hdr-row">
+    <div class="brand">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18v12H3z"/><path d="M3 10h18"/><path d="M7 15h4"/></svg>
+      攒钱小台
+    </div>
+    <div class="hdr-actions">
+      <span class="sync" title="本地离线模式"><span class="dot"></span>离线保存</span>
+      <button class="pill" onclick="exportJSON()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg>导出
+      </button>
+      <button class="pill" onclick="document.getElementById('imp').click()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21V9"/><path d="M7 13l5-5 5 5"/><path d="M5 3h14"/></svg>导入
+      </button>
+      <button class="pill" id="installBtn" style="display:none" onclick="installApp()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg>装到手机
+      </button>
+      <input id="imp" type="file" accept="application/json" style="display:none" onchange="importJSON(event)">
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div id="backupTip"></div>
+
+  <!-- 今天要处理 -->
+  <div class="today">
+    <h2>
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l9 4.5v10L12 21 3 16.5v-10z"/><path d="M12 7v5l3 2"/></svg>
+      今天要处理
+    </h2>
+    <div id="todayList"></div>
+  </div>
+
+  <!-- 顶部 Tab（PC） -->
+  <nav class="tabs" id="topTabs">
+    <button data-tab="ledger" class="active" onclick="switchTab('ledger')">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h13l3 3v13H4z"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>账本
+    </button>
+    <button data-tab="budget" onclick="switchTab('budget')">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18v12H3z"/><path d="M3 11h18"/><path d="M16 15h2"/></svg>预算储蓄
+    </button>
+    <button data-tab="invest" onclick="switchTab('invest')">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-5 4 4 8-8"/><path d="M16 8h5v5"/></svg>钱生钱
+    </button>
+  </nav>
+
+  <!-- 模块1 每日账本 -->
+  <section class="panel active" id="panel-ledger">
+    <div class="stats">
+      <div class="stat"><div class="s-label">本月收入</div><div class="s-val income" id="mIncome">¥0</div></div>
+      <div class="stat"><div class="s-label">本月支出<small>实际花费</small></div><div class="s-val expense" id="mExpense">¥0</div></div>
+      <div class="stat"><div class="s-label">本月结余<small>可存可用</small></div><div class="s-val save" id="mSave">¥0</div></div>
+    </div>
+    <div class="card">
+      <h3>
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+        记一笔
+      </h3>
+      <div class="row2">
+        <button class="btn-primary" style="background:var(--expense)" onclick="openForm('expense')">支出</button>
+        <button class="btn-primary" onclick="openForm('income')">收入</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18v12H3z"/><path d="M3 10h18"/></svg>
+        本月明细
+      </h3>
+      <div id="txList"></div>
+    </div>
+
+    <div class="card">
+      <h3>
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M3 12h18"/><circle cx="12" cy="12" r="9"/></svg>
+        数据管理 · 自动备份
+      </h3>
+      <div class="row2">
+        <button class="btn-line" onclick="manualBackupNow()">立即备份到文件</button>
+        <button class="btn-line danger" onclick="clearAll()">清空账本记录</button>
+      </div>
+      <label class="switch-row">
+        <span>改动后自动备份到文件</span>
+        <input type="checkbox" id="setAutoBak" onchange="toggleAutoBak()">
+      </label>
+      <div id="bakStatus" class="bak-status">尚未自动备份文件</div>
+      <div class="row2" style="margin-top:8px">
+        <button class="btn-line" onclick="restoreSnapshot()">从自动快照恢复</button>
+        <button class="btn-line" onclick="exportCSV()">导出 CSV</button>
+      </div>
+      <div class="disclaimer">数据默认存在本机浏览器。已开启「自动快照」：每次改动都先在本地存一份快照（最稳，不依赖网络/手势）；并按开关自动导出一份备份文件到手机「下载 / 文件」。换设备请用「立即备份到文件」或右上角「导出」，再到新设备「导入」。</div>
+    </div>
+  </section>
+
+  <!-- 模块2 预算与储蓄 -->
+  <section class="panel" id="panel-budget">
+    <div class="card">
+      <h3>
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18v12H3z"/><path d="M3 11h18"/></svg>
+        本月预算进度
+      </h3>
+      <div class="donut-wrap">
+        <svg id="donut" width="130" height="130" viewBox="0 0 130 130"></svg>
+        <div class="legend" id="budgetLegend"></div>
+      </div>
+      <div style="margin-top:12px">
+        <div class="fld" style="margin:0">
+          <label>每月生活费预算（元）</label>
+          <input type="number" id="setBudget" onchange="updateSettings()" inputmode="decimal">
+        </div>
+        <div class="fld" style="margin:10px 0 0">
+          <label>固定 AI 自我投资（元/月）</label>
+          <input type="number" id="setAi" onchange="updateSettings()" inputmode="decimal">
+        </div>
+        <div class="fld" style="margin:10px 0 0">
+          <label>记账起始月份</label>
+          <input type="month" id="setStart" onchange="updateSettings()">
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M3 12h18"/><circle cx="12" cy="12" r="9"/></svg>
+        生活费到账计划（每月两笔 750）
+      </h3>
+      <div id="paySchedule"></div>
+    </div>
+
+    <div class="card">
+      <h3>
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h18v18H3z"/><path d="M3 9h18M9 3v18"/></svg>
+        固定栏目 · 占月生活费比例
+      </h3>
+      <div id="colList"></div>
+      <div class="disclaimer">每栏显示你实际记录的金额，及其占月生活费（默认1500，可在上方「每月生活费预算」修改）的百分比。AI投资是你固定的自我投资，其余三栏按实际分配记录。</div>
+    </div>
+
+    <div class="card">
+      <h3>
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-5 4 4 8-8"/><path d="M16 8h5v5"/></svg>
+        储蓄目标
+      </h3>
+      <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--text-soft)">
+        <span>已攒（应急+预存）：<b style="color:var(--primary)" id="savedAmt">¥0</b></span>
+        <span>目标：<b id="targetTxt">¥0</b></span>
+      </div>
+      <div class="bar" id="goalBar"><i style="width:0%"></i></div>
+      <div style="font-size:12.5px;color:var(--text-soft);text-align:right" id="goalPct">0%</div>
+      <div class="fld" style="margin:12px 0 0">
+        <label>设定储蓄目标（元）</label>
+        <input type="number" id="setTarget" onchange="updateSettings()" inputmode="decimal">
+      </div>
+    </div>
+  </section>
+
+  <!-- 模块3 钱生钱 -->
+  <section class="panel" id="panel-invest">
+    <div class="card">
+      <h3>
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M5 8l7-5 7 5"/><circle cx="12" cy="14" r="6"/></svg>
+        低门槛理财科普（小钱也能生钱）
+      </h3>
+      <div id="prodList"></div>
+      <div class="disclaimer">
+        以上收益数据参考 <b>2026年8月</b> 市场水平（利率处下行周期，会持续调整），实际以你购买时银行/平台页面显示为准，<b>不构成投资建议</b>。核心原则：先留应急钱（≈3 个月生活费放灵活货基）→ 再用闲钱锁息（国债/定存）→ 长钱小额定投指数基金。量力而行，只投亏得起的钱。
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M5 8l7-5 7 5"/><circle cx="12" cy="14" r="6"/></svg>
+        指数估值红绿灯 · 定投助手
+      </h3>
+      <p class="sub">填你从下方入口查到的「当前 PE」，看现在是低估（绿灯·多买）/ 适中（黄灯·定投）/ 高估（红灯·暂停）。</p>
+      <div class="row2">
+        <div class="fld" style="margin:0"><label>选指数</label>
+          <select id="peIdx" onchange="onPeIdx()">
+            <option value="hs300">沪深300</option>
+            <option value="a500">中证A500</option>
+            <option value="zz500">中证500</option>
+            <option value="cyb">创业板指</option>
+            <option value="bonus">中证红利</option>
+          </select>
+        </div>
+        <div class="fld" style="margin:0"><label>当前 PE（去查）</label>
+          <input type="number" id="peVal" step="0.1" inputmode="decimal" placeholder="如 12.3">
+        </div>
+      </div>
+      <div id="peRef" class="pe-ref"></div>
+      <button class="btn-primary" onclick="checkPe()">看红绿灯</button>
+      <div id="peOut" class="pe-out" style="display:none"></div>
+      <div class="pe-query">
+        <span class="pe-query-t">查实时估值（需联网）：</span>
+        <a href="https://www.csindex.com.cn/#/indices/family" target="_blank" rel="noopener">中证指数官网</a>
+        <a href="https://danjuanfunds.com/synonymous/valuation" target="_blank" rel="noopener">蛋卷估值</a>
+        <a href="https://youqian.lu/indices" target="_blank" rel="noopener">有理有据</a>
+      </div>
+      <div class="pe-plan">
+        <h4>我的定投计划</h4>
+        <div class="row2">
+          <div class="fld" style="margin:0"><label>每月扣款日</label>
+            <input type="number" id="dcaDay" min="1" max="28" inputmode="numeric" onchange="saveDca()">
+          </div>
+          <div class="fld" style="margin:0"><label>每期金额（元）</label>
+            <input type="number" id="dcaAmt" inputmode="decimal" onchange="saveDca()">
+          </div>
+        </div>
+        <div class="pe-plan-note">设置后，到扣款日首页会提醒你「指数定投扣款」，一键记到「预存投资」。</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"/><path d="M4 9h16M9 4v16"/></svg>
+        收益计算器（单利）
+      </h3>
+      <div class="row2">
+        <div class="fld" style="margin:0"><label>本金（元）</label><input type="number" id="calcP" value="1000" inputmode="decimal"></div>
+        <div class="fld" style="margin:0"><label>年化（%）</label><input type="number" id="calcR" value="1.6" inputmode="decimal" step="0.1"></div>
+      </div>
+      <div class="fld"><label>期限</label>
+        <div class="row2">
+          <input type="number" id="calcT" value="365" inputmode="decimal">
+          <select id="calcUnit">
+            <option value="365">天</option>
+            <option value="12">月</option>
+            <option value="1">年</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn-primary" onclick="calcReturn()">计算预期收益</button>
+      <div id="calcOut" class="plan-out" style="display:none"></div>
+    </div>
+
+    <div class="card">
+      <h3>
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>
+        闲钱配置方案生成器
+      </h3>
+      <div class="fld"><label>你现在能拿出来的闲钱（元，非急用）</label>
+        <input type="number" id="planAmt" value="2000" inputmode="decimal">
+      </div>
+      <button class="btn-primary" onclick="genPlan()">生成我的配置方案</button>
+      <div id="planOut" class="plan-out" style="display:none"></div>
+    </div>
+  </section>
+</div>
+
+<!-- 底部 Tab（移动端） -->
+<nav class="bottom" id="bottomTabs">
+  <button data-tab="ledger" class="active" onclick="switchTab('ledger')">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h13l3 3v13H4z"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>账本
+  </button>
+  <button data-tab="budget" onclick="switchTab('budget')">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18v12H3z"/><path d="M3 11h18"/><path d="M16 15h2"/></svg>预算
+  </button>
+  <button data-tab="invest" onclick="switchTab('invest')">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-5 4 4 8-8"/><path d="M16 8h5v5"/></svg>钱生钱
+  </button>
+  <button data-tab="more" onclick="quickAdd()">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v8M8 12h8"/></svg>记一笔
+  </button>
+</nav>
+
+<!-- 记账弹窗 -->
+<div class="mask" id="mask">
+  <div class="sheet">
+    <h3 id="formTitle">记一笔</h3>
+    <div class="fld">
+      <div class="seg" id="typeSeg">
+        <button type="button" data-t="expense" class="on" onclick="setType('expense')">支出</button>
+        <button type="button" data-t="income" onclick="setType('income')">收入</button>
+      </div>
+    </div>
+    <div class="row2">
+      <div class="fld" style="margin:0"><label>日期</label><input type="date" id="fDate"></div>
+      <div class="fld" style="margin:0"><label>金额（元）</label><input type="number" id="fAmt" inputmode="decimal" step="0.01" placeholder="0.00"></div>
+    </div>
+    <div class="fld"><label>分类</label><select id="fCat"></select></div>
+    <div class="fld"><label>备注（可选）</label><input type="text" id="fNote" placeholder="例如：午饭 / 通勤 / 买课"></div>
+    <button class="btn-primary" onclick="saveTx()">保存</button>
+    <button class="pill" style="width:100%;justify-content:center;margin-top:10px;background:#eef2f1;color:var(--text-soft);min-height:44px" onclick="closeForm()">取消</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============ 数据层 ============ */
+const LS_TX='wb_jz_tx', LS_SET='wb_jz_settings', LS_BAK='wb_jz_backup';
+const INCOME_CATS=['生活费','其他收入'];
+const EXPENSE_CATS=['AI投资','生活消费','应急','预存投资','其他'];
+const CAT_COLOR={'AI投资':'#8b5cf6','生活消费':'#f97316','应急':'#0ea5e9','预存投资':'#14b8a6','其他':'#94a3b8','餐饮':'#f97316','交通':'#3b82f6','学习/AI投资':'#8b5cf6','日用':'#14b8a6','娱乐':'#ec4899','生活费':'#1f9d6b','其他收入':'#16a34a'};
+
+let transactions=[];
+let settings={budget:1500,ai:300,target:3000,startYM:'2026-09',dcaDay:10,dcaAmt:100,autoBackup:true,lastAutoBackup:0};
+let curType='expense';
+let editId=null;
+
+function load(){
+  try{const t=JSON.parse(localStorage.getItem(LS_TX));transactions=Array.isArray(t)?t:[];}catch(e){transactions=[];}
+  try{const s=JSON.parse(localStorage.getItem(LS_SET));if(s)settings=Object.assign(settings,s);}catch(e){}
+}
+function saveTxStore(){localStorage.setItem(LS_TX,JSON.stringify(transactions));scheduleAutoBackup();}
+function saveSetStore(){localStorage.setItem(LS_SET,JSON.stringify(settings));scheduleAutoBackup();}
+
+function seedIfEmpty(){
+  if(transactions.length>0)return;
+  const y=new Date().getFullYear(),m=new Date().getMonth();
+  const d=(day)=>dateStr(new Date(y,m,day));
+  // 默认不预置任何账目：等用户实际收到生活费 / 产生支出后再记
+  const base=[];
+  transactions=base;saveTxStore();
+}
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
+
+/* ============ 工具 ============ */
+const fmt=(n)=>'¥'+(Math.round(n*100)/100).toLocaleString('zh-CN',{minimumFractionDigits:0,maximumFractionDigits:2});
+function dateStr(d){const y=d.getFullYear();const m=String(d.getMonth()+1).padStart(2,'0');const day=String(d.getDate()).padStart(2,'0');return y+'-'+m+'-'+day;}
+const todayStr=()=>dateStr(new Date());
+function sameMonth(dateStr){const n=new Date(),t=new Date(dateStr);return t.getFullYear()===n.getFullYear()&&t.getMonth()===n.getMonth();}
+function monthTx(){return transactions.filter(t=>sameMonth(t.date));}
+function monthIncome(){return monthTx().filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);}
+function monthExpense(){return monthSpend();}
+function cumSave(){return transactions.reduce((s,t)=>s+(t.type==='income'?t.amount:-t.amount),0);}
+/* 累计真正存下的钱 = 应急 + 预存投资（储蓄不扣减，仅耗费的才算花掉） */
+function cumSaved(){return transactions.reduce((s,t)=>s+(t.type==='expense'&&isSave(t.category)?t.amount:0),0);}
+function curYM(){const n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0');}
+function fmtYM(ym){const p=String(ym).split('-');return p[0]+'年'+parseInt(p[1],10)+'月';}
+
+function toast(msg){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('show'),1800);}
+
+/* ============ 今天要处理 ============ */
+function renderToday(){
+  const box=document.getElementById('todayList');box.innerHTML='';
+  const n=new Date(),y=n.getFullYear(),m=n.getMonth(),day=n.getDate();
+  const cur=curYM(),start=settings.startYM||cur;
+  // 还没到记账起始月：显示提示，无需记录任何数据
+  if(start>cur){
+    box.innerHTML='<div class="empty">记账从 '+fmtYM(start)+' 开始，现在无需记录，先好好规划～</div>';return;
+  }
+  const tasks=[];
+  // 生活费两笔到账 1 / 15（起始月及之后才提醒）
+  [1,15].forEach(d=>{
+    const logged=transactions.some(t=>t.type==='income'&&t.category==='生活费'&&new Date(t.date).getDate()===d&&sameMonth(t.date)&&t.amount>=750);
+    if(!logged&&day>=d){
+      tasks.push({cls:day>d?'overdue':'',title:(day>d?'逾期 · ':'')+`${m+1}月${d}日 生活费 750 待记账`,sub:'点一键记账，把到账记上',btn:'记账',act:()=>quickIncome(d)});
+    }
+  });
+  // 指数定投扣款日提醒（起始月及之后、且当天未记预存投资定投）
+  if(settings.dcaDay&&Number(settings.dcaDay)===day){
+    const dcaLogged=transactions.some(t=>t.type==='expense'&&t.category==='预存投资'&&new Date(t.date).getDate()===day&&sameMonth(t.date)&&t.note&&t.note.indexOf('指数定投')>=0);
+    if(!dcaLogged){
+      tasks.push({cls:'',title:`指数定投扣款日 · 本期 ${fmt(settings.dcaAmt||0)} 待记账`,sub:'点一键记账（记到「预存投资」）',btn:'记账',act:()=>quickDca()});
+    }
+  }
+  const exp=monthSpend(),bg=settings.budget;
+  if(bg>0&&exp/bg>=0.9){
+    tasks.push({cls:'warn',title:`本月预算已用 ${Math.round(exp/bg*100)}%，注意控制`,sub:`已花 ${fmt(exp)} / 预算 ${fmt(bg)}`,btn:'看预算',act:()=>switchTab('budget')});
+  }
+  if(!transactions.some(t=>t.date===todayStr())){
+    tasks.push({cls:'',title:'今天还没记账哦',sub:'随手记一笔，攒钱更清晰',btn:'记一笔',act:()=>openForm('expense')});
+  }
+  if(tasks.length===0){
+    box.innerHTML='<div class="empty">今天没什么要处理，继续保持～</div>';return;
+  }
+  tasks.forEach(t=>{
+    const el=document.createElement('div');el.className='task '+t.cls;
+    el.innerHTML=`<div class="t-ico"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/></svg></div>
+      <div class="t-body"><div class="t-title">${t.title}</div><div class="t-sub">${t.sub}</div></div>
+      <button class="t-btn">${t.btn}</button>`;
+    el.querySelector('.t-btn').onclick=t.act;
+    box.appendChild(el);
+  });
+}
+function quickIncome(d){
+  const n=new Date();const dt=dateStr(new Date(n.getFullYear(),n.getMonth(),d));
+  openForm('income');document.getElementById('fDate').value=dt;document.getElementById('fAmt').value=750;
+  document.getElementById('fCat').value='生活费';  document.getElementById('fNote').value='生活费到账';
+}
+function quickDca(){
+  const n=new Date();const dt=dateStr(new Date(n.getFullYear(),n.getMonth(),n.getDate()));
+  openForm('expense');document.getElementById('fDate').value=dt;
+  document.getElementById('fAmt').value=settings.dcaAmt||0;
+  document.getElementById('fCat').value='预存投资';document.getElementById('fNote').value='指数定投扣款';
+}
+
+/* ============ 账本 ============ */
+function renderLedger(){
+  document.getElementById('mIncome').textContent=fmt(monthIncome());
+  document.getElementById('mExpense').textContent=fmt(monthSpend());
+  document.getElementById('mSave').textContent=fmt(monthIncome()-monthSpend());
+  const list=document.getElementById('txList');list.innerHTML='';
+  const arr=monthTx().slice().sort((a,b)=>b.date.localeCompare(a.date)||b.createdAt-a.createdAt);
+  if(arr.length===0){list.innerHTML='<div class="empty">本月还没有记录，点上方「支出 / 收入」开始记账</div>';return;}
+  arr.forEach(t=>{
+    const el=document.createElement('div');el.className='tx';
+    const exp=t.type==='expense';
+    el.innerHTML=`<div class="ic ${exp?'exp':'inc'}"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${exp?'<path d="M3 7h18v12H3z"/><path d="M3 11h18"/>':'<path d="M12 3v18M3 12h18"/>'}</svg></div>
+      <div class="meta"><div class="cat">${t.category}</div><div class="note">${t.date}${t.note?' · '+escapeHtml(t.note):''}</div></div>
+      <div class="amt ${exp?'exp':'inc'}">${exp?'-':'+'}${fmt(t.amount)}</div>
+      <button class="del" title="删除"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button>`;
+    el.querySelector('.del').onclick=()=>delTx(t.id);
+    list.appendChild(el);
+  });
+}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+/* ============ 预算与储蓄 ============ */
+function renderBudget(){
+  document.getElementById('setBudget').value=settings.budget;
+  document.getElementById('setAi').value=settings.ai;
+  document.getElementById('setTarget').value=settings.target;
+  document.getElementById('setStart').value=settings.startYM;
+  const ab=document.getElementById('setAutoBak');if(ab)ab.checked=!!settings.autoBackup;
+  updateBakStatus();
+  // 预算环（仅统计实际花费，储蓄不计入）
+  const exp=monthSpend(),bg=settings.budget;
+  const pct=bg>0?Math.min(exp/bg,1):0;
+  const r=52,c=2*Math.PI*r,off=c*(1-pct);
+  const col=pct>=1?'#e5484d':pct>=0.9?'#f59e0b':'#1f9d6b';
+  document.getElementById('donut').innerHTML=`
+    <circle cx="65" cy="65" r="${r}" fill="none" stroke="#eef2f1" stroke-width="13"/>
+    <circle cx="65" cy="65" r="${r}" fill="none" stroke="${col}" stroke-width="13" stroke-linecap="round"
+      stroke-dasharray="${c}" stroke-dashoffset="${off}" transform="rotate(-90 65 65)"/>
+    <text x="65" y="60" text-anchor="middle" font-size="20" font-weight="700" fill="#1f2933">${Math.round(pct*100)}%</text>
+    <text x="65" y="80" text-anchor="middle" font-size="11" fill="#64748b">已用 ${fmt(exp)}</text>`;
+  const left=bg-exp;
+  document.getElementById('budgetLegend').innerHTML=`
+    <div class="li"><span class="sw" style="background:${col}"></span>已花 <b>${fmt(exp)}</b></div>
+    <div class="li"><span class="sw" style="background:#eef2f1"></span>剩余 <b>${fmt(left)}</b></div>
+    <div class="li" style="color:var(--text-soft);font-size:12px;margin-top:4px">已花含固定 AI 投入 ${fmt(settings.ai)}；应急 / 预存投资算储蓄，不计入此花费</div>`;
+  // 到账计划
+  const n=new Date(),day=n.getDate();
+  const cur=curYM(),start=settings.startYM||cur;
+  const showYM=start>cur?start:cur;          // 当前月早于起始月时，预览起始月
+  const showParts=showYM.split('-');const showYear=parseInt(showParts[0],10),showM=parseInt(showParts[1],10);
+  const inCurMonth=(showYM===cur);            // 是否真实当前月（决定能否判定已记账/可记账）
+  const sch=document.getElementById('paySchedule');sch.innerHTML='';
+  if(showYM!==cur){sch.innerHTML='<div class="disclaimer" style="margin-bottom:8px">以下是 '+fmtYM(showYM)+' 的到账预览，到当月会自动转为可记账。</div>';}
+  [1,15].forEach(d=>{
+    const done=inCurMonth&&transactions.some(t=>t.type==='income'&&t.category==='生活费'&&new Date(t.date).getDate()===d&&sameMonth(t.date)&&t.amount>=750);
+    const row=document.createElement('div');row.className='tx';
+    row.innerHTML=`<div class="ic inc"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M3 12h18"/></svg></div>
+      <div class="meta"><div class="cat">${showM}月${d}日 · 生活费</div><div class="note">${done?'已记账':'待记账'}</div></div>
+      <div class="amt inc">+¥750</div>`;
+    if(!done&&inCurMonth&&day>=d){const b=document.createElement('button');b.className='t-btn';b.style.cssText='background:var(--expense)';b.textContent='记账';b.onclick=()=>quickIncome(d);row.appendChild(b);}
+    else if(done){const b=document.createElement('button');b.className='del';b.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';b.onclick=()=>{toast('已记账，可在账本删除');};row.appendChild(b);}
+    sch.appendChild(row);
+  });
+  // 储蓄目标：累计真正“存下”的钱（仅应急 + 预存投资）
+  const saved=Math.max(0,cumSaved());
+  document.getElementById('savedAmt').textContent=fmt(saved);
+  document.getElementById('targetTxt').textContent=fmt(settings.target);
+  const gp=settings.target>0?Math.min(saved/settings.target,1):0;
+  const gb=document.getElementById('goalBar');gb.className='bar'+(gp>=1?'':gp>=0.7?' bar-warn':'');
+  gb.firstElementChild.style.width=(gp*100)+'%';
+  document.getElementById('goalPct').textContent=Math.round(gp*100)+'%'+(gp>=1?' · 目标达成':'');
+  renderColumns();
+}
+/* ============ 固定栏目（占1500百分比） ============ */
+const COLUMNS=['AI投资','生活消费','应急','预存投资'];
+function colMap(cat){
+  if(cat==='AI投资'||cat==='学习/AI投资')return 'AI投资';
+  if(['生活消费','餐饮','交通','日用','娱乐'].includes(cat))return '生活消费';
+  if(cat==='应急')return '应急';
+  if(cat==='预存投资')return '预存投资';
+  return null;
+}
+function colActual(name){
+  return monthTx().filter(t=>t.type==='expense'&&colMap(t.category)===name).reduce((s,t)=>s+t.amount,0);
+}
+/* 应急 / 预存投资 是“存下的钱”，不是花掉的钱，单独归为储蓄类 */
+function isSave(cat){return cat==='应急'||cat==='预存投资';}
+function monthSpend(){return monthTx().filter(t=>t.type==='expense'&&!isSave(t.category)).reduce((s,t)=>s+t.amount,0);}
+function monthSave(){return monthTx().filter(t=>t.type==='expense'&&isSave(t.category)).reduce((s,t)=>s+t.amount,0);}
+function renderColumns(){
+  const base=settings.budget||1500;
+  const box=document.getElementById('colList');if(!box)return;box.innerHTML='';
+  let total=0;
+  COLUMNS.forEach(name=>{
+    const act=colActual(name);total+=act;
+    const pct=base>0?act/base*100:0;
+    const w=Math.min(pct,100);
+    const color=CAT_COLOR[name]||'#1f9d6b';
+    const fixed=(name==='AI投资')?'<span class="col-fixed">固定 '+fmt(settings.ai)+'/月</span>':'';
+    const el=document.createElement('div');el.className='col-row';
+    el.innerHTML=`<div class="col-head"><span class="col-name">${name}</span><span class="col-pct">${pct.toFixed(1)}%</span></div>
+      <div class="col-bar"><i style="width:${w}%;background:${color}"></i></div>
+      <div class="col-amt">${fmt(act)} <span class="col-base">/ 占${base} ${pct.toFixed(1)}%</span> ${fixed}</div>`;
+    box.appendChild(el);
+  });
+  const totalPct=base>0?total/base*100:0;
+  const tot=document.createElement('div');tot.className='col-total';
+  tot.innerHTML=`合计已分配：<b>${fmt(total)}</b> · 占月生活费 <b>${totalPct.toFixed(1)}%</b>`;
+  box.appendChild(tot);
+  const sv=monthSave();
+  const svEl=document.createElement('div');svEl.className='col-total';
+  svEl.style.borderTop='none';svEl.style.marginTop='6px';
+  svEl.innerHTML=`本月已存下（应急 + 预存投资）：<b>${fmt(sv)}</b>`;
+  box.appendChild(svEl);
+}
+function updateSettings(){
+  settings.budget=Math.max(0,parseFloat(document.getElementById('setBudget').value)||0);
+  settings.ai=Math.max(0,parseFloat(document.getElementById('setAi').value)||0);
+  settings.target=Math.max(0,parseFloat(document.getElementById('setTarget').value)||0);
+  const sv=document.getElementById('setStart').value;
+  if(/^\d{4}-\d{2}$/.test(sv))settings.startYM=sv;
+  saveSetStore();renderBudget();renderToday();toast('已保存设置');
+}
+
+/* ============ 记账表单 ============ */
+function setType(t){curType=t;
+  document.querySelectorAll('#typeSeg button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
+  fillCat();
+}
+function fillCat(){
+  const sel=document.getElementById('fCat');sel.innerHTML='';
+  (curType==='income'?INCOME_CATS:EXPENSE_CATS).forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;sel.appendChild(o);});
+}
+function openForm(type){
+  curType=type||'expense';editId=null;
+  document.getElementById('formTitle').textContent='记一笔 · '+(curType==='income'?'收入':'支出');
+  document.querySelectorAll('#typeSeg button').forEach(b=>b.classList.toggle('on',b.dataset.t===curType));
+  fillCat();
+  document.getElementById('fDate').value=todayStr();
+  document.getElementById('fAmt').value='';
+  document.getElementById('fNote').value='';
+  document.getElementById('mask').classList.add('show');
+}
+function closeForm(){document.getElementById('mask').classList.remove('show');}
+function saveTx(){
+  const amt=parseFloat(document.getElementById('fAmt').value);
+  if(!amt||amt<=0){toast('请输入有效金额');return;}
+  const t={id:uid(),date:document.getElementById('fDate').value||todayStr(),type:curType,
+    category:document.getElementById('fCat').value,amount:Math.round(amt*100)/100,note:document.getElementById('fNote').value.trim(),createdAt:Date.now()};
+  transactions.push(t);saveTxStore();
+  closeForm();renderAll();toast('已保存');
+}
+function delTx(id){
+  if(!confirm('确定删除这条记录？'))return;
+  transactions=transactions.filter(t=>t.id!==id);saveTxStore();renderAll();toast('已删除');
+}
+
+/* ============ 钱生钱 ============ */
+const PRODUCTS=[
+  {name:'货币基金（余额宝 / 零钱通）',risk:'low',rate:'七日年化 ≈ 1.0%（2026年8月全市场均值约0.97%~1.11%）',icon:'coin',
+   what:'本质就是“活期钱罐”：把钱借给银行/金融机构吃利息的基金，1元起、随时能取，平时可直接用来付钱。',
+   why:'你的应急金和“每月刚攒下、随时要用”的钱就该放这里——比银行卡活期(0.05%)高约6倍，且几乎不会亏，是活钱的最佳容器。',
+   how:'不用专门开户，直接在常用支付App操作：\n① 支付宝：首页搜“余额宝” → 转入（可设自动攒）\n② 微信：我 → 服务 → 钱包 → 零钱通 → 转入\n平时用哪个支付多就放哪个，省得来回转。',
+   watch:'看“七日年化收益率”（年化口径，比“万份收益”更直观）。2026年收益普遍破1%，每天小幅波动是正常的，不必天天盯。',
+   tip:'单日快速赎回通常限1万元；别把全部大额压一只，分散2~3只避免限额。它不保本（极端下极小概率负收益）。'},
+  {name:'银行定期存款',risk:'low',rate:'国有大行：1年0.95% / 3年1.25% / 5年1.30%；中小银行略高（3年约1.8%~2.1%）',icon:'bank',
+   what:'把钱存银行约定期限，到期还本付息。50元起，50万元以内受存款保险保障，是真正的“保本保息”。',
+   why:'给你“确定能拿到”的那部分收益，最简单最稳。闲钱中短期内不用的，可分批存，避免全存活期被通胀慢慢吃掉。',
+   how:'任意银行手机App或柜台：\n① 打开银行App → 搜索“存款”/“整存整取”\n② 选期限和金额 → 确认执行利率后存入\n技巧：中小银行(城商行/农商行)利率更高；用“阶梯存款”把一笔钱分1/2/3年存，兼顾收益和流动性。',
+   watch:'存好后看存单上的“到期日”和“执行利率”即可。注意：现在多数银行已取消靠档计息，提前取出按活期(0.05%)算，别轻易提前取。',
+   tip:'只认“存款”，不买名字像存款的“理财/保险”；确认有“存款保险”标识；50万元以内最安全。'},
+  {name:'储蓄国债（电子式）',risk:'low',rate:'2026年6月：3年期 1.63% / 5年期 1.70%（固定利率，按年付息）',icon:'gov',
+   what:'国家发行的“借条”，财政部+人民银行背书，几乎零风险。100元起，单账户每期最多买50万；每月10日发行、发行期约10天。',
+   why:'同样低风险的钱，国债利率比同期限定存高一点，且能锁定未来几年收益——利率下行周期里“提前锁息”很划算。',
+   how:'提前开好账户，发行日8:30准点抢（常被秒光）：\n① 选一家银行（工行/建行/农行/中行/邮储/中信等）\n② App搜“储蓄国债”或“债券” → 开通“国债托管账户”（首次需绑卡，几分钟）\n③ 每月10日 8:30 进App → 选3年/5年 → 输金额购买\n开通“个人养老金账户”后，也能用养老金买国债(享税优)。',
+   watch:'在财政部/人民银行公告查每月发行计划；App“债券”频道看剩余额度和自己持仓。每年付息日利息会自动打到你账户。',
+   tip:'发行期内不能提前取；之后可提前兑取但“靠档计息”并收1‰手续费(持有<6个月不计息)。手慢无，提前备好账户。'},
+  {name:'同业存单指数基金',risk:'low',rate:'年化 ≈ 1.3%~1.8%（2026年8月）；长期约2.3%+',icon:'list',
+   what:'跟踪“中证同业存单AAA指数”的基金，底层是银行间高信用等级存单，R1最低风险，1元起、通常设7天持有期、满7天免赎回费。',
+   why:'想比余额宝多赚一点、又不愿承担股票波动时选它；适合“3~6个月不用的闲钱”，收益略高于货基、回撤极小(历史<0.5%)。',
+   how:'在基金平台搜名字即可买：\n① 支付宝/微信理财通/天天基金/银行App → 搜“同业存单指数基金”\n② 选头部产品（如 南方/易方达/嘉实 中证同业存单AAA指数7天持有）\n③ 工作日15:00前申购按当天净值成交，一键买入',
+   watch:'看基金“近1年收益”和净值；记住有7天持有期——买入后7天内不能赎回(或收1.5%惩罚费)，用确定7天以上不动的钱买。',
+   tip:'这是基金不是存款，不受存款保险保护；风险极低但净值会小幅波动，别用随时要用的活钱买。'},
+  {name:'指数基金定投（沪深300 / 中证A500 等）',risk:'mid',rate:'长期（5~10年）年化 ≈ 8%±，但短期可能亏10%~20%',icon:'trend',
+   what:'每月自动小额买“一篮子股票”（如跟踪沪深300的指数基金），平摊成本、长期跟着经济上涨。波动大，是“用时间换收益”的工具。',
+   why:'你是学生、钱少、时间长——定投是把AI投入之外闲钱变成长期资产的起点；费用低、不靠选股，新手友好。',
+   how:'以支付宝为例（天天基金/微信理财通/券商App同理）：\n① 支付宝 → 理财 → 基金 → 搜“沪深300ETF联接”或“中证A500”\n② 选基：成立≥3年、规模20~200亿、管理费+托管费<1%、跟踪误差小\n③ 点“定投” → 设每月/每周、金额100元起（建议发薪后1~3天扣款）→ 提交\n进阶：低估多买、高估暂停（看“指数红绿灯”）',
+   watch:'看两点：①估值——用蚂蚁财富“指数红绿灯”、且慢/理杏仁小程序、中证指数官网(csindex.com.cn)看PE；低估(绿灯)多买、高估(红)暂停。②收益率——每季度看一眼定投收益，平时别天天盯；止盈：目标年化15%或估值高估时分批卖。',
+   tip:'四不：不追涨冠军基、不一次性梭哈、不跌一点就割肉、不借钱炒。少操作的人往往赚得更多。'}
+];
+const ICONS={
+  gov:'<path d="M3 21h18M5 21V10l7-5 7 5v11M9 21v-6h6v6"/>',
+  coin:'<circle cx="12" cy="12" r="9"/><path d="M12 7v10M9 10h6M9 14h6"/>',
+  bank:'<path d="M3 10l9-6 9 6M5 10v9M19 10v9M9 10v9M15 10v9M3 21h18"/>',
+  list:'<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
+  trend:'<path d="M3 17l5-5 4 4 8-8"/><path d="M16 8h5v5"/>'
+};
+function renderInvest(){
+  const box=document.getElementById('prodList');box.innerHTML='';
+  PRODUCTS.forEach(p=>{
+    const el=document.createElement('div');el.className='prod '+p.risk;
+    el.innerHTML=`<div class="p-head">
+        <div class="p-ico"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[p.icon]}</svg></div>
+        <div class="p-title"><div class="p-name">${p.name}<span class="tag ${p.risk}">${p.risk==='low'?'低风险':'中风险'}</span></div>
+        <div class="p-rate">参考收益：${p.rate}</div></div>
+      </div>
+      <div class="p-sec"><span class="p-label">是什么</span><div class="p-text">${p.what}</div></div>
+      <div class="p-sec"><span class="p-label">为什么投</span><div class="p-text">${p.why}</div></div>
+      <div class="p-sec"><span class="p-label">怎么买</span><div class="p-text">${p.how.replace(/\n/g,'<br>')}</div></div>
+      <div class="p-sec"><span class="p-label">怎么看</span><div class="p-text">${p.watch}</div></div>
+      <div class="p-tip">注意：${p.tip}</div>`;
+    box.appendChild(el);
+  });
+  renderDcaInputs();onPeIdx();
+}
+
+/* 指数估值红绿灯 + 定投助手 */
+const INDEX_PE={
+  hs300:{name:'沪深300',low:11,mid:13},
+  a500:{name:'中证A500',low:13,mid:15},
+  zz500:{name:'中证500',low:22,mid:28},
+  cyb:{name:'创业板指',low:35,mid:50},
+  bonus:{name:'中证红利',low:7,mid:9}
+};
+function onPeIdx(){
+  const o=INDEX_PE[document.getElementById('peIdx').value];
+  document.getElementById('peRef').textContent=`${o.name} 参考区间（会随市场变动，以实时查询为准）：低估 PE＜${o.low} · 适中 PE＜${o.mid} · 高估 PE≥${o.mid}`;
+}
+function checkPe(){
+  const o=INDEX_PE[document.getElementById('peIdx').value];
+  const pe=parseFloat(document.getElementById('peVal').value);
+  const out=document.getElementById('peOut');out.style.display='block';
+  if(!(pe>0)){out.innerHTML='<div class="disclaimer">请先填入查到的「当前 PE」。PE 可在下方入口查询。</div>';return;}
+  let light,status,advise;
+  if(pe<=o.low){
+    light='green';status='低估 · 绿灯';
+    advise=`当前 PE <b>${pe}</b> ≤ 低估线 ${o.low}，估值偏便宜。<b>建议：可正常开启或加码定投</b>，长期坚持摊低成本；别因短期波动停手。`;
+  }else if(pe<=o.mid){
+    light='yellow';status='适中 · 黄灯';
+    advise=`当前 PE <b>${pe}</b> 处于适中区（${o.low}~${o.mid}），估值合理。<b>建议：按原计划定投即可</b>，不必追也不躲。`;
+  }else{
+    light='red';status='高估 · 红灯';
+    advise=`当前 PE <b>${pe}</b> ≥ 高估线 ${o.mid}，估值偏贵。<b>建议：暂停追加投入</b>，已持有的继续拿、不卖；等回调到适中/低估再恢复定投。`;
+  }
+  out.innerHTML=`<div class="pe-card"><div class="pe-light ${light}"></div>
+    <div><div class="pe-status">${status}</div><div class="pe-sub">${o.name} · 当前 PE ${pe}（参考低估＜${o.low} / 高估≥${o.mid}）</div></div></div>
+    <div class="pe-advise">${advise}</div>
+    <div class="disclaimer" style="margin-top:10px">估值是粗略判断，PE 区间会随盈利变化而移动；仅供定投节奏参考，不构成投资建议。</div>`;
+}
+function renderDcaInputs(){
+  document.getElementById('dcaDay').value=settings.dcaDay||'';
+  document.getElementById('dcaAmt').value=settings.dcaAmt||'';
+}
+function saveDca(){
+  settings.dcaDay=Math.min(28,Math.max(1,parseInt(document.getElementById('dcaDay').value)||1));
+  settings.dcaAmt=Math.max(0,parseFloat(document.getElementById('dcaAmt').value)||0);
+  saveSetStore();toast('已保存定投计划');
+}
+
+function calcReturn(){
+  const P=parseFloat(document.getElementById('calcP').value)||0;
+  const r=parseFloat(document.getElementById('calcR').value)||0;
+  const T=parseFloat(document.getElementById('calcT').value)||0;
+  const unit=parseFloat(document.getElementById('calcUnit').value)||365;
+  const years=T/unit;
+  const gain=P*r/100*years;
+  const out=document.getElementById('calcOut');
+  out.style.display='block';
+  out.innerHTML=`本金 <b>${fmt(P)}</b>，年化 <b>${r}%</b>，期限 <b>${T}${unit===365?'天':unit===12?'个月':'年'}</b><br>
+    预期收益（单利）≈ <b>${fmt(gain)}</b><br>到期总额 ≈ <b>${fmt(P+gain)}</b>`;
+}
+function genPlan(){
+  const A=Math.max(0,parseFloat(document.getElementById('planAmt').value)||0);
+  const out=document.getElementById('planOut');out.style.display='block';
+  if(A<=0){out.innerHTML='<div class="disclaimer">先在上方输入金额（不能为 0）。</div>';return;}
+  // 三个方案：保守·应急先行 / 均衡·分层配置 / 进取·收益优先；按金额自适应
+  const schemes=[];
+  if(A<=4500){
+    // 金额不足以撑满 3 个月应急金：给出 3 个小额试水思路
+    schemes.push(
+      {name:'A · 保守·应急先行',risk:'low',riskTxt:'低',note:'金额不大，先把应急层打牢，最稳。等攒到 4500 再考虑锁息。',items:[['应急金',A,'货币基金（余额宝/零钱通）']]},
+      {name:'B · 均衡·小笔试水',risk:'mid',riskTxt:'中低',note:'应急打底 + 拿一小笔锁息 + 留点灵活，兼顾安全与起步。',items:[
+        ['应急金',Math.round(A*0.7),'货币基金'],
+        ['锁息钱',Math.round(A*0.2),'储蓄国债 / 银行定存（试水）'],
+        ['灵活保留',Math.round(A*0.1),'继续放货基']
+      ]},
+      {name:'C · 进取·小额练手',risk:'hi',riskTxt:'中',note:'应急够用即可，多出的一小笔定投 + 锁息，开始建立长期钱生钱习惯。',items:[
+        ['应急金',Math.round(A*0.5),'货币基金'],
+        ['锁息钱',Math.round(A*0.25),'储蓄国债 / 银行定存'],
+        ['定投练手',Math.round(A*0.25),'指数基金（沪深300 / 中证500）']
+      ]}
+    );
+  }else{
+    const EM=4500,rest=A-EM;
+    schemes.push(
+      {name:'A · 保守·应急先行',risk:'low',riskTxt:'低',note:'应急金先满 3 个月生活费，剩余全部锁息，最简单好执行。',items:[['应急金',EM,'货币基金'],['锁息钱',rest,'储蓄国债 / 银行定存']]},
+      {name:'B · 均衡·分层配置',risk:'mid',riskTxt:'中低',note:'应急打底 + 中长期锁息 + 小额定投 + 保留灵活，4 层分散。',items:[
+        ['应急金',EM,'货币基金'],
+        ['锁息钱',Math.round(rest*0.5),'储蓄国债 / 银行定存'],
+        ['定投练手',Math.round(rest*0.3),'指数基金（沪深300 / 中证500）'],
+        ['灵活保留',Math.round(rest*0.2),'继续放货基']
+      ]},
+      {name:'C · 进取·收益优先',risk:'hi',riskTxt:'中',note:'应急够用即可，更多比例压向锁息与定投，长期收益空间更大。',items:[
+        ['应急金',3000,'货币基金'],
+        ['锁息钱',Math.round((A-3000)*0.45),'储蓄国债 / 银行定存'],
+        ['定投练手',Math.round((A-3000)*0.4),'指数基金'],
+        ['灵活保留',Math.round((A-3000)*0.15),'继续放货基']
+      ]}
+    );
+  }
+  let html='<div class="plan-summary">你拿出的闲钱：<b>'+fmt(A)+'</b> · 三个思路，挑一个顺手的开始</div>';
+  schemes.forEach(sc=>{
+    const items=sc.items.filter(it=>Math.round(it[1])>0);
+    html+='<div class="plan-card">'
+      +'<div class="plan-card-head"><span class="plan-card-name">'+sc.name+'</span><span class="plan-card-risk risk-'+sc.risk+'">风险 '+sc.riskTxt+'</span></div>'
+      +'<ul class="plan-items">'+items.map(it=>'<li><b>'+fmt(it[1])+'</b><span class="plan-arr">→</span><span class="plan-target">'+it[0]+'</span><span class="plan-where">'+it[2]+'</span></li>').join('')+'</ul>'
+      +'<div class="plan-note">'+sc.note+'</div>'
+    +'</div>';
+  });
+  html+='<div class="disclaimer" style="margin-top:10px">每月新攒的钱：先入货基，攒够 1000 一笔就买一次国债/定存，滚雪球。收益均为参考区间，会随市场调整，<b>不构成投资建议</b>。</div>';
+  out.innerHTML=html;
+}
+
+/* ============ 导出 / 导入 / 清空 ============ */
+function exportJSON(){
+  const data={_app:'攒钱小台',_ver:1,exportedAt:dateStr(new Date())+' '+new Date().toTimeString().slice(0,5),settings,transactions};
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download='攒钱小台-备份-'+todayStr()+'.json';a.click();
+  toast('已导出 JSON 备份');
+}
+function exportCSV(){
+  const head=['日期','类型','分类','金额','备注'];
+  const rows=transactions.slice().sort((a,b)=>a.date.localeCompare(b.date)).map(t=>[t.date,t.type,t.category,t.amount,'"'+(t.note||'').replace(/"/g,'""')+'"']);
+  const csv='\ufeff'+[head,...rows].map(r=>r.join(',')).join('\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download='攒钱小台-账本-'+todayStr()+'.csv';a.click();
+  toast('已导出 CSV');
+}
+function importJSON(e){
+  const file=e.target.files[0];if(!file)return;
+  const rd=new FileReader();
+  rd.onload=()=>{
+    try{
+      const data=JSON.parse(rd.result);
+      if(!data.transactions||!Array.isArray(data.transactions))throw new Error('格式不符');
+      if(!confirm('导入将覆盖当前所有数据，确定继续？建议先导出备份。'))return;
+      transactions=data.transactions;
+      if(data.settings)settings=Object.assign(settings,data.settings);
+      saveTxStore();saveSetStore();renderAll();toast('导入成功，共 '+transactions.length+' 条');
+    }catch(err){alert('导入失败：文件格式不正确');}
+    e.target.value='';
+  };
+  rd.readAsText(file);
+}
+function clearAll(){
+  if(!confirm('确定清空所有记账记录？预算设置会保留，此操作不可恢复！建议先导出备份。'))return;
+  transactions=[];saveTxStore();renderAll();toast('已清空全部数据');
+}
+
+/* ============ 自动备份（降低手动备份成本） ============ */
+function downloadJSON(data, filename){
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download=filename;a.click();
+  setTimeout(()=>{try{URL.revokeObjectURL(a.href);}catch(e){}},1000);
+}
+function buildBackup(){
+  return {_app:'攒钱小台',_ver:1,_auto:true,
+    exportedAt:dateStr(new Date())+' '+new Date().toTimeString().slice(0,5),
+    settings, transactions};
+}
+/* 隐形快照：每次改动都先在本地存一份，不需要任何手势/网络，最稳的兜底 */
+function autoSnapshot(){
+  try{localStorage.setItem(LS_BAK,JSON.stringify({ts:Date.now(),settings,transactions}));}catch(e){}
+}
+let _autoTimer=null;
+function scheduleAutoBackup(){
+  autoSnapshot();                       // 立刻存快照（不依赖手势，最可靠）
+  if(!settings.autoBackup)return;
+  clearTimeout(_autoTimer);
+  _autoTimer=setTimeout(()=>{          // 防抖：连续改动只导一份文件
+    try{
+      downloadJSON(buildBackup(),'攒钱小台-自动备份-'+todayStr()+'.json');
+      settings.lastAutoBackup=Date.now();
+      localStorage.setItem(LS_SET,JSON.stringify(settings)); // 直接写，避免递归
+      updateBakStatus();
+    }catch(e){}
+  },1500);
+}
+function updateBakStatus(){
+  const el=document.getElementById('bakStatus');if(!el)return;
+  if(settings.lastAutoBackup){
+    const d=new Date(settings.lastAutoBackup);
+    el.textContent='上次自动备份（文件）：'+dateStr(d)+' '+d.toTimeString().slice(0,5);
+  }else{el.textContent='尚未自动备份文件';}
+}
+function restoreSnapshot(){
+  try{
+    const s=JSON.parse(localStorage.getItem(LS_BAK));
+    if(!s||!Array.isArray(s.transactions))throw new Error('no snapshot');
+    if(!confirm('从自动快照恢复？将用快照覆盖当前数据（快照含 '+s.transactions.length+' 条）。建议先点「立即备份到文件」留底。'))return;
+    transactions=s.transactions;
+    if(s.settings)settings=Object.assign(settings,s.settings);
+    saveTxStore();saveSetStore();renderAll();toast('已从自动快照恢复');
+  }catch(e){alert('没有可用的自动快照');}
+}
+function manualBackupNow(){
+  try{
+    downloadJSON(buildBackup(),'攒钱小台-备份-'+todayStr()+'.json');
+    settings.lastAutoBackup=Date.now();
+    localStorage.setItem(LS_SET,JSON.stringify(settings));
+    updateBakStatus();toast('已备份到文件');
+  }catch(e){alert('备份失败：'+e.message);}
+}
+function toggleAutoBak(){
+  const cb=document.getElementById('setAutoBak');
+  settings.autoBackup=!!(cb&&cb.checked);
+  saveSetStore();updateBakStatus();
+  toast(settings.autoBackup?'已开启自动备份':'已关闭自动备份');
+}
+
+/* ============ 导航 / 渲染 ============ */
+function switchTab(tab){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  const pm={ledger:'panel-ledger',budget:'panel-budget',invest:'panel-invest'}[tab];
+  if(pm)document.getElementById(pm).classList.add('active');
+  document.querySelectorAll('#topTabs button,#bottomTabs button').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
+  if(tab==='budget')renderBudget();
+}
+function quickAdd(){openForm('expense');}
+
+function renderBackupTip(){
+  const tip=document.getElementById('backupTip');
+  if(transactions.length>=30){
+    tip.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 2 18a2 2 2 0 0 0 1.7 3h16.6A2 2 0 0 0 22 18L13.7 3.9a2 2 2 0 0 0-3.4 0z"/></svg>
+      数据已积累 ${transactions.length} 条，建议点右上角「导出」备份一下～`;
+  }else{tip.innerHTML='';}
+}
+function renderAll(){
+  renderToday();renderLedger();renderBudget();renderInvest();renderBackupTip();
+}
+
+/* ============ 启动 ============ */
+load();
+seedIfEmpty();
+renderAll();
+
+/* ============ PWA：安装到主屏幕 + 离线 ============ */
+let _deferredPrompt=null;
+const installBtn=document.getElementById('installBtn');
+function installApp(){
+  if(_deferredPrompt){_deferredPrompt.prompt();_deferredPrompt.userChoice.finally(()=>{_deferredPrompt=null;});}
+}
+window.addEventListener('beforeinstallprompt',(e)=>{
+  e.preventDefault();_deferredPrompt=e;
+  if(installBtn)installBtn.style.display='';
+});
+window.addEventListener('appinstalled',()=>{
+  if(installBtn)installBtn.style.display='none';
+  toast('已安装到主屏幕 🎉');
+});
+/* iPhone 引导：未独立运行且是 iOS，提示用 Safari 添加到主屏幕 */
+if(/iP(ad|hone|od)/.test(navigator.userAgent) && !window.navigator.standalone){
+  const t=document.getElementById('backupTip');
+  if(t) t.innerHTML='📲 iPhone：点 Safari 底部「分享」→「添加到主屏幕」，即可像 App 一样打开放大镜';
+}
+/* 注册 Service Worker：仅 http(s) 下有效，file:// 自动跳过（不影响使用） */
+if('serviceWorker' in navigator && location.protocol.indexOf('http')===0){
+  window.addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{});});
+}
+</script>
+</body>
+</html>
